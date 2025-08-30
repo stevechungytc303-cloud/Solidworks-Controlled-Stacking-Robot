@@ -5,8 +5,7 @@ This project extracts pick-up and drop-off coordinates from two SolidWorks Assem
 - **Gearboxes**: Three custom 1:20 cycloidal gearboxes provide high torque and compact form factor
 - **Payload Capacity**: Supports up to 5 kg of stacked weight within an 80 cm diameter workspace, using a vacuum suction mechanism for reliable pick-and-place operations
 
-CAD Link:
-- https://grabcad.com/library/6dof-arm-v1-1
+CAD Link: https://grabcad.com/library/6dof-arm-v1-1
 
 ## Demo Video
 
