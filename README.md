@@ -6,7 +6,7 @@ This project extracts pick-up and drop-off coordinates from two SolidWorks Assem
 - **Payload Capacity**: Supports up to 5 kg of stacked weight within an 80 cm diameter workspace, using a vacuum suction mechanism for reliable pick-and-place operations
 
 CAD Link:
--https://grabcad.com/library/6dof-arm-v1-1
+- https://grabcad.com/library/6dof-arm-v1-1
 
 ## Demo Video
 
