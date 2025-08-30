@@ -3,6 +3,6 @@ This software extracts pick-up and drop-off coordinates from two SolidWorks Asse
 
 ## Demo Video
 
-Watch the robot arm in action:  
-[![Robot Arm Demo](https://img.youtube.com/vi/8PGG2dZVc4I/0.jpg)](https://www.youtube.com/shorts/8PGG2dZVc4I)
+Watch the robot in action:  
+[![Robot Demo](https://img.youtube.com/vi/8PGG2dZVc4I/0.jpg)](https://www.youtube.com/shorts/8PGG2dZVc4I)
 
