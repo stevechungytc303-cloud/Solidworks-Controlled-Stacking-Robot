@@ -5,7 +5,7 @@ This project extracts pick-up and drop-off coordinates from two SolidWorks Assem
 - **Gearboxes**: Three custom 1:20 cycloidal gearboxes provide high torque and compact form factor
 - **Payload Capacity**: Can lift and move up to 5 kg of stacked items within an 80 cm-wide area, using a vacuum suction mechanism for reliable pick-and-place operations
 
-**CAD Link**: https://grabcad.com/library/6dof-arm-v1-1
+**CAD Link**: (https://grabcad.com/library/solidworks-controlled-stacking-robot-1)
 
 ## Demo Video
 
