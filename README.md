@@ -1,2 +1,2 @@
 # Solidworks-Controlled-Stacking-Robot
-This software extracts pickup and drop-off coordinates from two SolidWorks assemblies that simulate the stacking robot's workspace. The combined data is then sent to an Arduino, which controls the robot's movements to execute the stacking task.
+This software extracts pick-up and drop-off coordinates from two SolidWorks Assembly files: one showing the robot’s starting environment and one showing the final stacked layout. Macros created using the SolidWorks API extract the coordinates and generate a temporary PowerShell script. The script sends the data to the computer port connected to the robot’s Arduino, which moves the robot accordingly.
