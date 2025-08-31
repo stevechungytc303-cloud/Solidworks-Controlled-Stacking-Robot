@@ -1,0 +1,288 @@
+Option Explicit
+
+' To run, paste this into Solidworks macro editor, program also assumes arduino is connected to COM3
+
+Dim swApp As SldWorks.SldWorks
+Dim swModel As SldWorks.ModelDoc2
+Dim swAssy As SldWorks.AssemblyDoc
+
+' This is the main routine of the macro. It checks for an active assembly document, finds all reference points, saves them to a file, and sends them to an Arduino.
+Sub Main()
+
+    On Error GoTo ErrorHandler
+
+    Set swApp = Application.SldWorks
+    Set swModel = swApp.ActiveDoc
+
+    If swModel Is Nothing Then
+        MsgBox "Please open an assembly document first.", vbCritical, "Macro Error"
+        Exit Sub
+    End If
+
+    If swModel.GetType <> swDocumentTypes_e.swDocASSEMBLY Then
+        MsgBox "This macro works only with assembly documents.", vbCritical, "Macro Error"
+        Exit Sub
+    End If
+
+    Set swAssy = swModel
+
+    Dim sCoordinatesMessageForArduino As String
+    Dim sCoordinatesMessageForFile As String
+    Dim allExtractedPoints As New Collection
+    Dim currentPointsCollection As Collection
+
+    Set currentPointsCollection = ProcessModelReferencePoints(swModel, "Assembly")
+    Dim pointStr As Variant
+    For Each pointStr In currentPointsCollection
+        allExtractedPoints.Add pointStr
+    Next
+
+    Dim vComps As Variant
+    vComps = swAssy.GetComponents(False)
+
+    If Not IsEmpty(vComps) Then
+        Dim i As Long
+        For i = 0 To UBound(vComps)
+            Dim swComp As SldWorks.Component2
+            Set swComp = vComps(i)
+
+            If swComp.GetSuppression <> swComponentSuppressed Then
+                Set currentPointsCollection = ProcessComponentReferencePoints(swComp)
+                For Each pointStr In currentPointsCollection
+                    allExtractedPoints.Add pointStr
+                Next
+            End If
+        Next i
+    End If
+
+    Dim pointCount As Integer
+    pointCount = 0
+
+    If allExtractedPoints.Count > 0 Then
+        sCoordinatesMessageForArduino = "Pickup "
+        sCoordinatesMessageForFile = "Pickup "
+    End If
+
+    For Each pointStr In allExtractedPoints
+        If pointCount > 0 Then
+            sCoordinatesMessageForArduino = sCoordinatesMessageForArduino & " Z "
+            sCoordinatesMessageForFile = sCoordinatesMessageForFile & " Z "
+        End If
+        sCoordinatesMessageForArduino = sCoordinatesMessageForArduino & pointStr
+        sCoordinatesMessageForFile = sCoordinatesMessageForFile & pointStr
+        pointCount = pointCount + 1
+    Next
+
+    If allExtractedPoints.Count = 0 Then
+        MsgBox "No reference points found in the assembly or its components.", vbExclamation, "Macro Info"
+        Exit Sub
+    End If
+
+    Dim filePath As String
+    filePath = CreateFilePath()
+
+    Dim fileNum As Integer
+    fileNum = FreeFile
+    Open filePath For Output As #fileNum
+
+    Print #fileNum, sCoordinatesMessageForFile
+
+    Close #fileNum
+
+    MsgBox "Reference points extracted and saved to: " & filePath & vbCrLf & _
+           "Total points: " & allExtractedPoints.Count, vbInformation, "SolidWorks Reference Point Saver"
+
+    Dim sPowerShellScriptPath As String
+    Dim sComPort As String
+    Dim sPowerShellContent As String
+    Dim sPowerShellCommand As String
+    Dim lRetVal As Long
+    Dim fso As Object
+    Dim ts As Object
+
+    sComPort = "COM3"
+
+    sPowerShellScriptPath = Environ("USERPROFILE") & "\Downloads\Joe3.ps1"
+
+    sPowerShellContent = ""
+    sPowerShellContent = sPowerShellContent & "# Joe3.ps1 - Created by SolidWorks VBA" & vbCrLf
+    sPowerShellContent = sPowerShellContent & "param(" & vbCrLf
+    sPowerShellContent = sPowerShellContent & "    [string]$ComPort = """ & sComPort & """," & vbCrLf
+    sPowerShellContent = sPowerShellContent & "    [int]$BaudRate = 9600," & vbCrLf
+    sPowerShellContent = sPowerShellContent & "    [string]$Message" & vbCrLf
+    sPowerShellContent = sPowerShellContent & ")" & vbCrLf
+    sPowerShellContent = sPowerShellContent & "" & vbCrLf
+    sPowerShellContent = sPowerShellContent & "try {" & vbCrLf
+    sPowerShellContent = sPowerShellContent & "    $port = New-Object System.IO.Ports.SerialPort $ComPort,$BaudRate,None,8,one" & vbCrLf
+    sPowerShellContent = sPowerShellContent & "    $port.Open()" & vbCrLf
+    sPowerShellContent = sPowerShellContent & "    $port.WriteLine($Message)" & vbCrLf
+    sPowerShellContent = sPowerShellContent & "    $port.Close()" & vbCrLf
+    sPowerShellContent = sPowerShellContent & "    $port.Dispose()" & vbCrLf
+    sPowerShellContent = sPowerShellContent & "} catch {" & vbCrLf
+    sPowerShellContent = sPowerShellContent & "    Write-Error ""Failed to send coordinates to $ComPort. Error: $($_.Exception.Message)""" & vbCrLf
+    sPowerShellContent = sPowerShellContent & "}" & vbCrLf
+
+    Set fso = CreateObject("Scripting.FileSystemObject")
+
+    If fso.FileExists(sPowerShellScriptPath) Then
+        fso.DeleteFile sPowerShellScriptPath, True
+    End If
+
+    Set ts = fso.CreateTextFile(sPowerShellScriptPath, True)
+    ts.Write sPowerShellContent
+    ts.Close
+    Set ts = Nothing
+    Set fso = Nothing
+
+    Debug.Print "PowerShell script created at: " & sPowerShellScriptPath
+
+    sPowerShellCommand = "powershell.exe -ExecutionPolicy Bypass -File """ & sPowerShellScriptPath & """ -ComPort " & sComPort & " -Message """ & sCoordinatesMessageForArduino & """"
+
+    Debug.Print "Attempting to send coordinates via PowerShell. Total characters: " & Len(sCoordinatesMessageForArduino)
+    Debug.Print "Full PowerShell command: " & sPowerShellCommand
+
+    lRetVal = Shell(sPowerShellCommand, vbHide)
+
+    If lRetVal = 0 Then
+        MsgBox "Failed to start PowerShell script. Check script path and permissions.", vbCritical, "PowerShell Error"
+    Else
+        MsgBox "Successfully sent " & allExtractedPoints.Count & " reference points to Arduino via " & sComPort & " using PowerShell!", vbInformation, "SolidWorks Serial Sender"
+    End If
+
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If fso.FileExists(sPowerShellScriptPath) Then
+        fso.DeleteFile sPowerShellScriptPath, True
+    End If
+    Set fso = Nothing
+
+    Exit Sub
+
+ErrorHandler:
+    MsgBox "An error occurred: " & Err.Description & vbCrLf & _
+           "Ensure 'Microsoft Scripting Runtime' is referenced (Tools > References).", vbCritical, "Runtime Error"
+    Dim tempFileNum As Integer
+    tempFileNum = FreeFile
+    If tempFileNum > 0 Then
+        On Error Resume Next
+        If LOF(fileNum) > 0 Then Close #fileNum
+        On Error GoTo 0
+    End If
+    If Not ts Is Nothing Then ts.Close
+    Set ts = Nothing
+    Set fso = Nothing
+
+End Sub
+
+' This function processes the active SolidWorks model document (the assembly itself). It finds and extracts coordinates from `RefPoint` features.
+Function ProcessModelReferencePoints(swDoc As SldWorks.ModelDoc2, prefix As String) As Collection
+
+    Dim currentPoints As New Collection
+    Dim swFeat As SldWorks.Feature
+    Set swFeat = swDoc.FirstFeature
+
+    While Not swFeat Is Nothing
+        If swFeat.GetTypeName2 = "RefPoint" Then
+            Dim swRefPt As SldWorks.RefPoint
+            Set swRefPt = swFeat.GetSpecificFeature2
+
+            If Not swRefPt Is Nothing Then
+                Dim swMathPt As SldWorks.MathPoint
+                Set swMathPt = swRefPt.GetRefPoint
+
+                If Not swMathPt Is Nothing Then
+                    Dim vRefPtData As Variant
+                    vRefPtData = swMathPt.ArrayData
+
+                    Dim x As Double, y As Double, z As Double
+                    x = vRefPtData(0)
+                    y = vRefPtData(1)
+                    z = vRefPtData(2)
+
+                    currentPoints.Add Format(x * 1000, "0.00") & " " & Format(y * 1000, "0.00") & " " & Format(z * 1000, "0.00")
+                End If
+            End If
+        End If
+
+        Set swFeat = swFeat.GetNextFeature
+    Wend
+
+    Set ProcessModelReferencePoints = currentPoints
+
+End Function
+
+' This function processes an individual component within an assembly. It transforms the coordinates of `RefPoint` features from the component's local system to the assembly's global system.
+Function ProcessComponentReferencePoints(swComp As SldWorks.Component2) As Collection
+
+    Dim currentPoints As New Collection
+    Dim swCompModel As SldWorks.ModelDoc2
+    Set swCompModel = swComp.GetModelDoc2
+
+    If Not swCompModel Is Nothing Then
+        Dim swXform As SldWorks.MathTransform
+        Set swXform = swComp.Transform2
+
+        Dim mathUtils As SldWorks.MathUtility
+        Set mathUtils = swApp.GetMathUtility
+
+        Dim swFeat As SldWorks.Feature
+        Set swFeat = swCompModel.FirstFeature
+
+        While Not swFeat Is Nothing
+            If swFeat.GetTypeName2 = "RefPoint" Then
+                Dim swRefPt As SldWorks.RefPoint
+                Set swRefPt = swFeat.GetSpecificFeature2
+
+                If Not swRefPt Is Nothing Then
+                    Dim swMathPt As SldWorks.MathPoint
+                    Set swMathPt = swRefPt.GetRefPoint
+
+                    If Not swMathPt Is Nothing Then
+                        Dim vRefPtData As Variant
+                        vRefPtData = swMathPt.ArrayData
+
+                        Dim x As Double, y As Double, z As Double
+                        x = vRefPtData(0)
+                        y = vRefPtData(1)
+                        z = vRefPtData(2)
+
+                        Dim transformData(2) As Double
+                        transformData(0) = x: transformData(1) = y: transformData(2) = z
+
+                        Dim mathPt_local As SldWorks.MathPoint
+                        Set mathPt_local = mathUtils.CreatePoint(transformData)
+                        Set mathPt_local = mathPt_local.MultiplyTransform(swXform)
+
+                        Dim newPtData As Variant
+                        newPtData = mathPt_local.ArrayData
+                        x = newPtData(0): y = newPtData(1): z = newPtData(2)
+
+                        currentPoints.Add Format(x * 1000, "0.00") & " " & Format(y * 1000, "0.00") & " " & Format(z * 1000, "0.00")
+                    End If
+                End If
+            End If
+
+            Set swFeat = swFeat.GetNextFeature
+        Wend
+    Else
+    End If
+
+    Set ProcessComponentReferencePoints = currentPoints
+
+End Function
+
+' This helper function creates the full file path for the output text file, based on the assembly's title.
+Function CreateFilePath() As String
+
+    Dim assemblyName As String
+    assemblyName = swModel.GetTitle
+
+    If InStr(assemblyName, ".") > 0 Then
+        assemblyName = Left(assemblyName, InStr(assemblyName, ".") - 1)
+    End If
+
+    Dim filePath As String
+    filePath = Environ("USERPROFILE") & "\Downloads\" & assemblyName & "_ReferencePoints.txt"
+
+    CreateFilePath = filePath
+
+End Function
