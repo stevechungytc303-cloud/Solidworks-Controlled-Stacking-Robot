@@ -1,6 +1,6 @@
 Option Explicit
 
-' To run, paste this into Solidworks macro editor, program also assumes arduino is connected to COM3
+' Disclaimer!!! This program assumes Arduino is connected to COM3
 
 Dim swApp As SldWorks.SldWorks
 Dim swModel As SldWorks.ModelDoc2
@@ -286,3 +286,4 @@ Function CreateFilePath() As String
     CreateFilePath = filePath
 
 End Function
+
