@@ -1,5 +1,5 @@
 # Solidworks-Controlled-Stacking-Robot
-This project uses macros created using SolidWorks API to extract pick-up and drop-off coordinates from two SolidWorks assembly files: one showing the robot's starting environment and the other showing the final stacked layout. After the extraction, a temporary PowerShell script is generated to send the coordinates to the computer port connected to the robot. With the coordinates, the robot starts picking up and placing objects to recreate the final stacked layout.
+This project uses macros created using SolidWorks API to extract pick-up and drop-off coordinates from two SolidWorks assembly files: one showing the robot's starting environment and one showing the final stacked layout. After the extraction, a temporary PowerShell script is generated to send the coordinates to the computer port connected to the robot. With the coordinates, the robot starts picking up and placing objects to recreate the final stacked layout.
 (More below)
 ## Robot Info
 ![Robotic Arm](SolidworksControlledStackingRobotImage.png)
